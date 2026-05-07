@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WL Membership — Sample Size Calculator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fb; color: #1a1a2e; padding: 32px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 28px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card { background: white; border-radius: 12px; padding: 22px; border: 1px solid #e5e7eb; }
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; margin-bottom: 16px; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 5px; }
+  .hint { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+  input[type=number], select {
+    width: 100%; padding: 9px 13px; border: 1px solid #d1d5db;
+    border-radius: 8px; font-size: 14px; color: #1a1a2e; background: #fafafa; outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus { border-color: #6366f1; background: white; }
+  .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .preset-btn {
+    padding: 5px 13px; border-radius: 20px; border: 1px solid #d1d5db;
+    background: white; font-size: 12px; color: #374151; cursor: pointer; font-weight: 500;
+    transition: all .15s;
+  }
+  .preset-btn:hover { border-color: #6366f1; color: #6366f1; background: #f5f3ff; }
+  .preset-btn.active { border-color: #6366f1; color: #6366f1; background: #f5f3ff; }
+  .divider { height: 1px; background: #f3f4f6; margin: 16px 0; }
+  .locked-row { display: flex; gap: 12px; }
+  .locked-row .field { flex: 1; }
+  .locked-tag { display: inline-block; font-size: 10px; background: #f3f4f6; color: #6b7280; border-radius: 4px; padding: 2px 6px; margin-left: 6px; font-weight: 500; vertical-align: middle; }
+  .results-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+  .result-card { background: white; border-radius: 12px; padding: 18px; border: 1px solid #e5e7eb; text-align: center; }
+  .result-card.hero { background: #6366f1; border-color: #6366f1; }
+  .result-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; margin-bottom: 6px; }
+  .hero .result-label { color: rgba(255,255,255,.7); }
+  .result-value { font-size: 28px; font-weight: 700; color: #1a1a2e; line-height: 1.1; }
+  .hero .result-value { color: white; }
+  .result-sub { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+  .hero .result-sub { color: rgba(255,255,255,.6); }
+  .warn-box { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 10px; padding: 13px 16px; font-size: 13px; color: #92400e; margin-bottom: 16px; line-height: 1.6; }
+  .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; font-size: 13px; color: #1e40af; line-height: 1.75; }
+  .info-box strong { font-weight: 600; }
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+    .results-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>WL Membership — Experiment Sample Size Calculator</h1>
+<p class="subtitle">Bayesian stats engine · GrowthBook aligned · 5% significance · 80% power</p>
+
+<div class="grid">
+
+  <div class="card">
+    <div class="card-title">Experiment Inputs</div>
+
+    <div class="field">
+      <label>Baseline CVR (%)</label>
+      <input type="number" id="baselineCVR" min="0.1" max="100" step="0.1" placeholder="e.g. 4" oninput="calc()">
+      <div class="hint">Current conversion rate for the metric you're testing</div>
+    </div>
+
+    <div class="field">
+      <label>Minimum Detectable Effect <span style="color:#9ca3af;font-weight:400">— relative %</span></label>
+      <div class="preset-row" id="mdePresets">
+        <button class="preset-btn" onclick="setMDE(3)">3%</button>
+        <button class="preset-btn" onclick="setMDE(5)">5%</button>
+        <button class="preset-btn" onclick="setMDE(10)">10%</button>
+        <button class="preset-btn" onclick="setMDE(15)">15%</button>
+      </div>
+      <input type="number" id="mde" min="0.5" max="50" step="0.5" placeholder="e.g. 5" oninput="onMdeInput()">
+      <div class="hint">Smallest relative lift worth shipping. Smaller MDE = longer runtime.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Traffic & Test Setup</div>
+
+    <div class="field">
+      <label>Daily Exposed Users (total)</label>
+      <input type="number" id="dailyUsers" min="10" step="50" placeholder="e.g. 600" oninput="calc()">
+      <div class="hint">Total users entering this step per day across all variants</div>
+    </div>
+
+    <div class="field">
+      <label>Number of Variants</label>
+      <select id="numVariants" onchange="calc()">
+        <option value="2" selected>2 — Control + 1 variant</option>
+        <option value="3">3 — Control + 2 variants</option>
+        <option value="4">4 — Control + 3 variants</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="locked-row">
+      <div class="field">
+        <label>Significance <span class="locked-tag">locked</span></label>
+        <input type="number" value="5" disabled style="opacity:.4;cursor:not-allowed">
+        <div class="hint">5% (one-sided)</div>
+      </div>
+      <div class="field">
+        <label>Power <span class="locked-tag">locked</span></label>
+        <input type="number" value="80" disabled style="opacity:.4;cursor:not-allowed">
+        <div class="hint">80% standard</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="warnBox" class="warn-box"></div>
+
+<div class="results-grid">
+  <div class="result-card hero">
+    <div class="result-label">Min. Runtime</div>
+    <div class="result-value" id="rDays">—</div>
+    <div class="result-sub">days recommended</div>
+  </div>
+  <div class="result-card">
+    <div class="result-label">Sample / Variant</div>
+    <div class="result-value" id="rPerVar">—</div>
+    <div class="result-sub">users needed</div>
+  </div>
+  <div class="result-card">
+    <div class="result-label">Total Sample</div>
+    <div class="result-value" id="rTotal">—</div>
+    <div class="result-sub">across all variants</div>
+  </div>
+  <div class="result-card">
+    <div class="result-label">Detectable Lift</div>
+    <div class="result-value" id="rAbs">—</div>
+    <div class="result-sub">absolute CVR ppts</div>
+  </div>
+</div>
+
+<div id="infoBox" class="info-box">Fill in baseline CVR, MDE, and daily traffic above to get your recommended runtime.</div>
+
+<script>
+function setMDE(v) {
+  document.getElementById('mde').value = v;
+  document.querySelectorAll('#mdePresets .preset-btn').forEach(function(b) {
+    b.classList.toggle('active', parseFloat(b.textContent) === v);
+  });
+  calc();
+}
+
+function onMdeInput() {
+  document.querySelectorAll('#mdePresets .preset-btn').forEach(function(b) { b.classList.remove('active'); });
+  calc();
+}
+
+function zInv(p) {
+  var a = [2.515517, 0.802853, 0.010328];
+  var b = [1.432788, 0.189269, 0.001308];
+  var t = Math.sqrt(-2 * Math.log(Math.min(p, 1 - p)));
+  var n = a[0] + a[1]*t + a[2]*t*t;
+  var d = 1 + b[0]*t + b[1]*t*t + b[2]*t*t*t;
+  var z = t - n/d;
+  return p < 0.5 ? -z : z;
+}
+
+function calc() {
+  var baselineRaw = parseFloat(document.getElementById('baselineCVR').value);
+  var mdeRaw      = parseFloat(document.getElementById('mde').value);
+  var dailyRaw    = parseFloat(document.getElementById('dailyUsers').value);
+  var nVar        = parseInt(document.getElementById('numVariants').value) || 2;
+
+  if (isNaN(baselineRaw) || isNaN(mdeRaw) || isNaN(dailyRaw)) {
+    ['rDays','rPerVar','rTotal','rAbs'].forEach(function(id){ document.getElementById(id).textContent = '—'; });
+    document.getElementById('warnBox').style.display = 'none';
+    document.getElementById('infoBox').innerHTML = 'Fill in baseline CVR, MDE, and daily traffic above to get your recommended runtime.';
+    return;
+  }
+
+  var baseline = baselineRaw / 100;
+  var mdeRel   = mdeRaw / 100;
+
+  // 5% significance (one-sided) = z 1.645, 80% power = z 0.842
+  var zA = Math.abs(zInv(0.05));
+  var zP = 0.842;
+
+  var absEff = baseline * mdeRel;
+  var p2     = baseline + absEff;
+  var pooled = (baseline + p2) / 2;
+
+  var nPerVar = Math.ceil(
+    Math.pow(zA * Math.sqrt(2 * pooled * (1 - pooled)) + zP * Math.sqrt(baseline*(1-baseline) + p2*(1-p2)), 2)
+    / Math.pow(absEff, 2)
+  );
+
+  // Bayesian efficiency factor (GrowthBook prior SD 0.3)
+  nPerVar = Math.ceil(nPerVar * 0.92);
+
+  var total       = nPerVar * nVar;
+  var dailyPerVar = dailyRaw / nVar;
+  var days        = Math.max(Math.ceil(nPerVar / dailyPerVar), 7);
+
+  document.getElementById('rDays').textContent   = days;
+  document.getElementById('rPerVar').textContent = nPerVar.toLocaleString();
+  document.getElementById('rTotal').textContent  = total.toLocaleString();
+  document.getElementById('rAbs').textContent    = (absEff * 100).toFixed(2) + ' ppts';
+
+  var warns = [];
+  if (days > 60) warns.push('Runtime exceeds 60 days — consider raising your MDE or narrowing test scope.');
+  if (baseline < 0.02 && mdeRel < 0.05) warns.push('Low CVR + small MDE = very long runtime. Consider MDE of 10%+ for this metric.');
+  if (nVar > 2) warns.push('Multiple variants split traffic. Consider running sequentially if volume is limited.');
+  if (dailyRaw / nVar < 50) warns.push('Fewer than 50 users/day per variant — test may not be feasible at current traffic levels.');
+
+  var wb = document.getElementById('warnBox');
+  if (warns.length) { wb.style.display = 'block'; wb.innerHTML = '⚠️ ' + warns.join('<br>⚠️ '); }
+  else wb.style.display = 'none';
+
+  document.getElementById('infoBox').innerHTML =
+    '<strong>How to read this:</strong> To detect a <strong>' + mdeRaw + '% relative lift</strong> on a <strong>' + baselineRaw.toFixed(1) + '% baseline CVR</strong>' +
+    ' (' + baselineRaw.toFixed(1) + '% → ' + (p2*100).toFixed(2) + '%, or +' + (absEff*100).toFixed(2) + ' ppts), you need <strong>' + nPerVar.toLocaleString() + ' users per variant</strong> — roughly <strong>' + days + ' days</strong> at your current traffic.' +
+    '<br><br><strong>Call rule (both required):</strong>' +
+    ' &nbsp;① Minimum runtime reached &nbsp;② Chance to Win ≥ 95% in GrowthBook' +
+    '<br><br><em>The "1,000 subscriber" rule is not a valid stopping criterion — sample size depends on your baseline CVR and the effect size you\'re trying to detect.</em>';
+}
+</script>
+</body>
+</html>
